@@ -1,7 +1,7 @@
 import socket
 
 target_host = input("Please enter a target IP: ")
-target_port = input("Specify a port: ")
+target_port = int(input("Specify a port: "))
 
 # Create socket object
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
