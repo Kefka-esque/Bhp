@@ -27,6 +27,7 @@ def receive_from(connection):
 	try:
 		while True:
 			data = connection.recv(4096)
+			print(data)
 			if not data:
 				break
 			buffer += data
@@ -35,18 +36,18 @@ def receive_from(connection):
 	return buffer
 
 # request and response handlers can be written to modify packets if needed:
-def request_handler(buffer)
+def request_handler(buffer):
 	#stuff goes here
 	return buffer
 
-def response_handler(buffer)
+def response_handler(buffer):
 	#stuff goes here
 	return buffer
 
 def proxy_handler(client_socket, remote_host, remote_port, receive_first):
 	remote_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	remote_socket.connect((remote_host, remote_port))
-	
+	retrycount = 0 # Retry counter for the while loop below; I was having trouble with the connection closing and being finnicky in general, even with a very high settimeout value. This fixes it.
 	if receive_first:
 		remote_buffer = receive_from(client_socket)
 		hexdump(remote_buffer)
@@ -73,13 +74,16 @@ def proxy_handler(client_socket, remote_host, remote_port, receive_first):
 			hexdump(remote_buffer)
 			remote_buffer = response_handler(remote_buffer)
 			client_socket.send(remote_buffer)
-			print("[<--] Sent to locallost.")
+			print("[<--] Sent to localhost.")
 			
-		if not len(local_buffer) or not len(remote_buffer):
-			client_socket.close()
-			remote_socket.close()
-			print("[X] No more data! Closing connections...")
-			break
+		if not len(local_buffer) and not len(remote_buffer):
+			print("[X] No more data! Retry %d" % retrycount)
+			retrycount += 1
+			if retrycount == 3:
+				print("[X] Quiet on the wire; closing connection...")
+				client_socket.close()
+				remote_socket.close()
+				break
 			
 def server_loop(local_host, local_port, remote_host, remote_port, receive_first):
 	server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -98,13 +102,13 @@ def server_loop(local_host, local_port, remote_host, remote_port, receive_first)
 		line = "[-->] Received incoming connection from %s:%d" % (addr[0], addr[1])
 		print(line)
 		proxy_thread = threading.Thread(
-			target=proxy_handler,
-			args=(client_socket, remote_host, remote_port, receive_first))
+			target = proxy_handler,
+			args = (client_socket, remote_host, remote_port, receive_first))
 		proxy_thread.start()
 		
 def main():
 	if len(sys.argv[1:]) != 5:
-		print("Usage: proxy.py [local host] [local port]". end=' ')
+		print("Usage: proxy.py [local host] [local port]", end=' ')
 		print("[remote host] [remote port] [receive_first]")
 		print("Ex. proxy.py 127.0.0.1 9999 10.15.6.1 9999 True")
 		sys.exit()
@@ -121,5 +125,5 @@ def main():
 		
 	server_loop(local_host, local_port, remote_host, remote_port, receive_first)
 	
-if __name__ == __main__:
+if __name__ == '__main__':
 	main()
